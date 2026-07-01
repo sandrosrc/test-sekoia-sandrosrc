@@ -1,0 +1,44 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: redis-poem
+  labels:
+    app: redis-poem
+spec:
+  volumes:
+    - name: redis-data
+      emptyDir: {}
+  initContainers:
+    - name: get-aof-file
+      image: curlimages/curl:latest
+      workingDir: /data
+      command: ["sh", "-c", "curl -L -o /data/poem-1-.aof https://raw.githubusercontent.com/sandrosrc/test-sekoia-sandrosrc/master/poem-1-.aof"]
+      volumeMounts:
+        - name: redis-data
+          mountPath: /data
+    - name: fix-aof-file
+      image: redis:6.2
+      workingDir: /data
+      command: ["sh", "-c", "echo \"y\" | redis-check-aof --fix poem-1-.aof"]
+      volumeMounts:
+        - name: redis-data
+          mountPath: /data
+  containers:
+    - name: redis
+      image: redis:6.2
+      workingDir: /data
+      command: ["sh", "-c", "redis-server --appendonly yes --appendfilename poem-1-.aof"]
+      volumeMounts:
+        - name: redis-data
+          mountPath: /data
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-poem
+spec:
+  selector:
+    app: redis-poem
+  ports:
+    - port: 6379
+      targetPort: 6379
